@@ -2,6 +2,7 @@ package dk.nezbo.ir.ass2
 
 import com.github.aztek.porterstemmer.PorterStemmer
 import scala.collection.mutable.HashMap
+import ch.ethz.dal.classifier.processing.XMLDocument
 
 object Utilities {
 
@@ -19,5 +20,9 @@ object Utilities {
       stemCache.put(word, PorterStemmer.stem(word))
     }
     stemCache(word)
+  }
+  
+  def getTermFrequencies(doc: XMLDocument) : Map[String,Int] = {
+    doc.tokens.map(Utilities.getStem(_)).groupBy(identity).mapValues(v => v.length)
   }
 }

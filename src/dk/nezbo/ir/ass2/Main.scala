@@ -9,13 +9,13 @@ import java.io.FileWriter
 
 object Main {
   
-  val TO_TRAIN = Int.MaxValue 
-  val TO_TEST = Int.MaxValue
-  val TO_VERIFY = Int.MaxValue
+  //val TO_TRAIN = Int.MaxValue 
+  //val TO_TEST = Int.MaxValue
+  //val TO_VERIFY = Int.MaxValue
   
-  //val TO_TRAIN = 100000
-  //val TO_TEST = 5000
-  //val TO_VERIFY = 5000
+  val TO_TRAIN = 25000
+  val TO_TEST = 5000
+  val TO_VERIFY = 5000
   val ITERATIONS = 2
   
   var cfs : Map[String,Int] = null
@@ -86,9 +86,9 @@ object Main {
 
     	// print comparrison
     	val foundSet = all.toSet
-    	prec += precision(foundSet,doc.topics)
-    	rec += recall(foundSet,doc.topics)
-    	f1sc += f1score(prec,rec)
+    	prec = prec + precision(foundSet,doc.topics)
+    	rec = rec + recall(foundSet,doc.topics)
+    	f1sc = f1sc + f1score(prec,rec)
     	
     	fw.write(doc.ID+" ")
     	for(clazz <- all){
@@ -98,7 +98,7 @@ object Main {
     	
     	i = i + 1
     }
-    fw.write((prec/i)+" "+(rec/i)+" "+(f1sc/i)+"\n")
+    fw.write((prec/i.toDouble)+" "+(rec/i.toDouble)+" "+(f1sc/i.toDouble)+"\n")
     fw.close()
     
     val total = (tp + tn + fp + fn).toDouble
@@ -157,12 +157,29 @@ object Main {
     found.intersect(relevant).size.toDouble / relevant.size.toDouble
   }
   
-  def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : Seq[Classifier] = {
+  def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : Iterable[Classifier] = {
 	if(method.equals("lr")){
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
 	    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
 	    return topics.keys.map(t => new LogisticRegression(t,train)).toList
+	}else if(method.equals("nb")){
+		// divide docs tfs to different topics by reference, without duplicates
+		val map = scala.collection.mutable.HashMap.empty[String,ListBuffer[(Map[String,Int],Int)]]
+		var totDocs = 0
+		for(doc <- iter){
+		  totDocs = totDocs + 1
+		  val tfs = Utilities.getTermFrequencies(doc)
+		  val tuple = ((tfs,doc.tokens.length))
+		  for(topic <- doc.topics){
+		    if(!map.contains(topic))
+		      map(topic) = new ListBuffer[(Map[String,Int],Int)]
+		    map(topic) += tuple
+		  }
+		}
+		
+		// give correct set of docs to appropriate classifiers
+		return map.map(kv => new NaiveBayes(kv._1, kv._2, totDocs))
 	}
 	List() // PLEASE DONT GO HERE :P
   }
@@ -177,7 +194,7 @@ object Main {
     println("> Creating CFs")
     for(doc <- iter){
       num_docs = num_docs + 1
-      cfs ++= getTermFrequencies(doc).filter(t => keywords.contains(t._1)).map(c => (c._1  -> (1 + cfs.getOrElse(c._1, 0))))
+      cfs ++= Utilities.getTermFrequencies(doc).filter(t => keywords.contains(t._1)).map(c => (c._1  -> (1 + cfs.getOrElse(c._1, 0))))
       
       if(num_docs % 1000 == 0) println(num_docs + " docs handled")
     }
@@ -197,10 +214,6 @@ object Main {
     Math.log(n) - Math.log(df)
   }
   
-  def getTermFrequencies(doc: XMLDocument) : Map[String,Int] = {
-    doc.tokens.map(Utilities.getStem(_)).groupBy(identity).mapValues(v => v.length)
-  }
-  
   def loadTopics() : Map[String,Set[String]] = {
     val file = scala.io.Source.fromFile("./reuter/topic_codes.txt")
     val lines = file.getLines
@@ -217,7 +230,8 @@ object Main {
   }
   
   def lrFeatures(doc: XMLDocument) : Array[Double] = {
-    val tfs = getTermFrequencies(doc)
+    val tfs = Utilities.getTermFrequencies(doc)
 	cfs.map(kv => Math.max(0.0 ,Main.tfidf(tfs.getOrElse(kv._1,0),kv._2, 200000))).toArray
   }
+
 }
