@@ -9,28 +9,24 @@ import java.io.FileWriter
 
 object Main {
   
-  val TO_TRAIN = Int.MaxValue 
+  val TO_TRAIN = 100000
   val ITERATIONS = 1
   
   var cfs : Map[String,Int] = null
 
   def main(args: Array[String]): Unit = {
-    val CLASSIFIER = args(0)
+    val METHOD = args(0)
     
     // load topics and definitions
     val topicDefs : Map[String,Set[String]] = loadTopics()
     
     println(topicDefs)
     
-    // Load documents and transform to features,topics
+    // Load documents for transformation
     val iter = new ReutersCorpusIterator("./reuter/data/train").take(TO_TRAIN)
     
-    // get idf values (for topic descriptions)
-    cfs = calculateCFS(topicDefs)
-    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
-    
     // Initialize classifiers (per topic)
-    val classifiers = topicDefs.keys.map(t => (t,new LogisticRegression(t,train)))
+    val classifiers = getClassifiers(METHOD, topicDefs, iter)
     
     // For each iteration, let all classifiers process 
     // their (previously given) training data
@@ -39,8 +35,8 @@ object Main {
 
 	    // Expose document to all classifiers
 	    for(clf <- classifiers){
-	    	clf._2.train(i)
-	    	println("\t["+clf._1+"] Done")
+	    	clf.train(i)
+	    	println("\t["+clf.getTopic+"] Done")
 	    }
     }
     
@@ -53,10 +49,10 @@ object Main {
     for(doc <- test_docs){
     	var all = new ListBuffer[String]()
     	for(cl <- classifiers){
-    		val choice = cl._2.classify(doc)
-    		if(choice) all += cl._1
+    		val choice = cl.classify(doc)
+    		if(choice) all += cl.getTopic
     		
-    		val reality = doc.topics.contains(cl._1)
+    		val reality = doc.topics.contains(cl.getTopic)
     		def addResult(combo:(Boolean,Boolean)) = combo match {
     		  case (true,true) => tp = tp + 1
     		  case (true,false) => fp = fp + 1
@@ -77,15 +73,15 @@ object Main {
     
     // Classify unknown documents for all topics for all classifiers
     val verification_docs = new ReutersCorpusIterator("./reuter/data/test-without-labels")
-    val file = new File("reuter/results/classify-emil-jacobsen-u-"+CLASSIFIER+".run")
+    val file = new File("reuter/results/classify-emil-jacobsen-u-"+METHOD+".run")
     file.getParentFile().mkdir()
     val fw = new FileWriter(file,true)
     
     for(doc <- verification_docs){
     	var all = new ListBuffer[String]()
     	for(cl <- classifiers){
-    		val choice = cl._2.classify(doc)
-    		if(choice) all += cl._1
+    		val choice = cl.classify(doc)
+    		if(choice) all += cl.getTopic
     	}
     	
     	// print comparrison
@@ -95,6 +91,13 @@ object Main {
     	}
     	fw.write("\n")
     }
+  }
+  
+  def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : Seq[Classifier] = {
+	// get idf values (for topic descriptions)
+    cfs = calculateCFS(topics)
+    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+    topics.keys.map(t => new LogisticRegression(t,train)).toList
   }
   
   def calculateCFS(topics: Map[String,Set[String]]) = {

@@ -4,7 +4,7 @@ import scala.collection.immutable.Set
 import ch.ethz.dal.classifier.processing.XMLDocument
 import scala.util.Random
 
-class LogisticRegression(label: String, train: Seq[(Set[String],Array[Double])]) extends Classifier {
+class LogisticRegression(topic: String, train: Seq[(Set[String],Array[Double])]) extends Classifier {
   
   // FIELDS
   
@@ -15,12 +15,16 @@ class LogisticRegression(label: String, train: Seq[(Set[String],Array[Double])])
   
   // INHERITED FUNCTIONS
   
+  def getTopic() : String = {
+    topic
+  }
+  
   def train(iteration: Integer) : Unit = {
     val lRate = 1.0/iteration.toDouble
     
 
     for(doc <- train){
-    	val positive = doc._1.contains(label)
+    	val positive = doc._1.contains(topic)
     	theta = updateTheta(doc._2, theta, lRate, positive)	
     }
 	    
