@@ -20,16 +20,17 @@ class NaiveBayes(topic: String, cDocs: Seq[(Map[String,Int],Int)], totDocs: Int)
 	def classify(doc: XMLDocument) : Boolean = {
 	  val _2 = Utilities.getTermFrequencies(doc).map(kv => kv._2 * logpHatWC(kv._1)).sum
 	  val value = logpHatC + _2
-	  //println(_1 +"+"+_2+"="+value)
+	  println(logpHatC +"+"+_2+"="+value)
 	  
 	  (value > 0.5)
 	}
 	
 	private def logpHatWC(word: String) : Double = {
-	  val result = cDocs.map(d => d._1.getOrElse(word, 0)).sum.toDouble / totLength
+	  val result = logpHatWCmap.getOrElse(word, 0.0)
 	  
-	  if(result > 0.0)
-	    Math.log10(result)
+	  if(result > 0.0){
+	    return Math.log10(result)
+	  }
 	  0.0
 	}
 }

@@ -66,7 +66,7 @@ object Main {
     
     println("> Test set comparrison started.")
     for(doc <- test_docs){
-    	if(i % 1000 == 0)
+    	if(i % 1 == 0)
     	  println("\t"+i+" documents processed.")
       
     	var all = new ListBuffer[String]()
@@ -140,20 +140,23 @@ object Main {
   }
   
   def f1score(prec: Double, recall: Double) : Double = {
-    if(prec+recall < 0.0001)
-      0.0
+    if(prec+recall < 0.0001){
+      return 0.0
+    }
     2.0 * (prec*recall) / (prec+recall)
   }
   
   def precision[T](found: Set[T], relevant: Set[T]) : Double = {
-    if(found.size == 0)
-      0
+    if(found.size == 0){
+      0.0
+    }
     found.intersect(relevant).size.toDouble / found.size.toDouble
   }
   
   def recall[T](found: Set[T], relevant: Set[T]) : Double = {
-    if(relevant.size == 0)
-      0
+    if(relevant.size == 0){
+      0.0
+    }
     found.intersect(relevant).size.toDouble / relevant.size.toDouble
   }
   
@@ -179,7 +182,7 @@ object Main {
 		}
 		
 		// give correct set of docs to appropriate classifiers
-		return map.map(kv => new NaiveBayes(kv._1, kv._2, totDocs))
+		return map.map(kv => new NaiveBayes(kv._1, kv._2, totDocs)).toList
 	}
 	List() // PLEASE DONT GO HERE :P
   }
