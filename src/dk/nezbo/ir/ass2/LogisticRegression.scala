@@ -22,7 +22,6 @@ class LogisticRegression(topic: String, train: Seq[(Set[String],Array[Double])])
   def train(iteration: Integer) : Unit = {
     val lRate = 1.0/iteration.toDouble
     
-
     for(doc <- train){
     	val positive = doc._1.contains(topic)
     	theta = updateTheta(doc._2, theta, lRate, positive)	
@@ -39,7 +38,7 @@ class LogisticRegression(topic: String, train: Seq[(Set[String],Array[Double])])
   
   // HELPER FUNCTIONS
   
-    def innerProduct(v1: Array[Double], v2: Array[Double]) : Double = {
+  def innerProduct(v1: Array[Double], v2: Array[Double]) : Double = {
     v1.zip(v2).map(p => p._1 * p._2).sum
   }
   

@@ -9,8 +9,14 @@ import java.io.FileWriter
 
 object Main {
   
-  val TO_TRAIN = 100000
-  val ITERATIONS = 1
+  val TO_TRAIN = Int.MaxValue 
+  val TO_TEST = Int.MaxValue
+  val TO_VERIFY = Int.MaxValue
+  
+  //val TO_TRAIN = 100000
+  //val TO_TEST = 5000
+  //val TO_VERIFY = 5000
+  val ITERATIONS = 2
   
   var cfs : Map[String,Int] = null
 
@@ -23,30 +29,46 @@ object Main {
     println(topicDefs)
     
     // Load documents for transformation
+    println("> Preparing Training data")
     val iter = new ReutersCorpusIterator("./reuter/data/train").take(TO_TRAIN)
     
     // Initialize classifiers (per topic)
     val classifiers = getClassifiers(METHOD, topicDefs, iter)
     
-    // For each iteration, let all classifiers process 
+    // For each classifier (in parrallel) do x iterations with
     // their (previously given) training data
-    for(i <- (1 to ITERATIONS)){
-    	println("Starting Iteration "+i)
-
-	    // Expose document to all classifiers
-	    for(clf <- classifiers){
-	    	clf.train(i)
-	    	println("\t["+clf.getTopic+"] Done")
-	    }
+    println("> Training classifiers")
+    for(clf <- classifiers.par){
+      for(i <- (1 to ITERATIONS)){
+        clf.train(i)
+        println("\t["+clf.getTopic+"] Iteration "+i+" done.")
+      }
     }
     
     // Evaluate on known documents
+    var i = 0
     var tp = 0
     var tn = 0
     var fp = 0
     var fn = 0
-    val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels")
+    println()
+    println("> Preparing Test data")
+    
+    val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels").take(TO_TEST)
+    var file = new File("reuter/results/classify-emil-jacobsen-l-"+METHOD+".run")
+    file.getParentFile().mkdir()
+    var fw = new FileWriter(file,true)
+    
+    // For statistics
+    var prec = 0.0
+    var rec = 0.0
+    var f1sc = 0.0
+    
+    println("> Test set comparrison started.")
     for(doc <- test_docs){
+    	if(i % 1000 == 0)
+    	  println("\t"+i+" documents processed.")
+      
     	var all = new ListBuffer[String]()
     	for(cl <- classifiers){
     		val choice = cl.classify(doc)
@@ -61,23 +83,43 @@ object Main {
     		}
     		addResult(choice,reality)
     	}
-    	
+
     	// print comparrison
-    	//println("Reality: "+doc.topics.toString+" Classified: "+all.toSet.toString)
+    	val foundSet = all.toSet
+    	prec += precision(foundSet,doc.topics)
+    	rec += recall(foundSet,doc.topics)
+    	f1sc += f1score(prec,rec)
+    	
+    	fw.write(doc.ID+" ")
+    	for(clazz <- all){
+    		fw.write(clazz+" ")
+    	}
+    	fw.write("\n")
+    	
+    	i = i + 1
     }
+    fw.write((prec/i)+" "+(rec/i)+" "+(f1sc/i)+"\n")
+    fw.close()
+    
     val total = (tp + tn + fp + fn).toDouble
     println("\nEvaluations: TP="+tp+" TN="+tn+" FP="+fp+" FN="+fn)
     println("accuracy (TP+TN/tot)="+((tp+tn).toDouble/total))
     println("sensitivity (TP/TP+FN)="+(tp.toDouble/(tp.toDouble+fn.toDouble)))
     println("fall-out (FP/FP+TN)="+(fp.toDouble/(fp.toDouble+tn.toDouble)))
     
-    // Classify unknown documents for all topics for all classifiers
-    val verification_docs = new ReutersCorpusIterator("./reuter/data/test-without-labels")
-    val file = new File("reuter/results/classify-emil-jacobsen-u-"+METHOD+".run")
+    // Classify unknown documents for all topics
+    println("> Preparing Validation data")
+    val verification_docs = new ReutersCorpusIterator("./reuter/data/test-without-labels").take(TO_VERIFY)
+    file = new File("reuter/results/classify-emil-jacobsen-u-"+METHOD+".run")
     file.getParentFile().mkdir()
-    val fw = new FileWriter(file,true)
+    fw = new FileWriter(file,true)
     
+    println("> Validation set classification started.")
+    i = 0
     for(doc <- verification_docs){
+        if(i % 1000 == 0)
+    	  println("\t"+i+" documents processed.")
+    	  
     	var all = new ListBuffer[String]()
     	for(cl <- classifiers){
     		val choice = cl.classify(doc)
@@ -85,19 +127,44 @@ object Main {
     	}
     	
     	// print comparrison
-    	fw.write(doc.name+" ")
+    	fw.write(doc.ID+" ")
     	for(clazz <- all){
     		fw.write(clazz+" ")
     	}
     	fw.write("\n")
+    	
+    	i = i + 1
     }
+    fw.close()
+    println("> Everything done.")
+  }
+  
+  def f1score(prec: Double, recall: Double) : Double = {
+    if(prec+recall < 0.0001)
+      0.0
+    2.0 * (prec*recall) / (prec+recall)
+  }
+  
+  def precision[T](found: Set[T], relevant: Set[T]) : Double = {
+    if(found.size == 0)
+      0
+    found.intersect(relevant).size.toDouble / found.size.toDouble
+  }
+  
+  def recall[T](found: Set[T], relevant: Set[T]) : Double = {
+    if(relevant.size == 0)
+      0
+    found.intersect(relevant).size.toDouble / relevant.size.toDouble
   }
   
   def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : Seq[Classifier] = {
-	// get idf values (for topic descriptions)
-    cfs = calculateCFS(topics)
-    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
-    topics.keys.map(t => new LogisticRegression(t,train)).toList
+	if(method.equals("lr")){
+	    // get idf values (for topic descriptions)
+	    cfs = calculateCFS(topics)
+	    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+	    return topics.keys.map(t => new LogisticRegression(t,train)).toList
+	}
+	List() // PLEASE DONT GO HERE :P
   }
   
   def calculateCFS(topics: Map[String,Set[String]]) = {
@@ -107,7 +174,7 @@ object Main {
     println(keywords)
     
     val cfs = scala.collection.mutable.Map[String, Int]()
-    println("CREATING CFS")
+    println("> Creating CFs")
     for(doc <- iter){
       num_docs = num_docs + 1
       cfs ++= getTermFrequencies(doc).filter(t => keywords.contains(t._1)).map(c => (c._1  -> (1 + cfs.getOrElse(c._1, 0))))
