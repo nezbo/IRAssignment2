@@ -9,13 +9,13 @@ import java.io.FileWriter
 
 object Main {
   
-  //val TO_TRAIN = Int.MaxValue 
-  //val TO_TEST = Int.MaxValue
-  //val TO_VERIFY = Int.MaxValue
+  val TO_TRAIN = Int.MaxValue 
+  val TO_TEST = Int.MaxValue
+  val TO_VERIFY = Int.MaxValue
   
-  val TO_TRAIN = 25000
-  val TO_TEST = 5000
-  val TO_VERIFY = 5000
+  //val TO_TRAIN = 25000
+  //val TO_TEST = 5000
+  //val TO_VERIFY = 5000
   val ITERATIONS = 2
   
   var cfs : Map[String,Int] = null
@@ -66,7 +66,7 @@ object Main {
     
     println("> Test set comparrison started.")
     for(doc <- test_docs){
-    	if(i % 1 == 0)
+    	if(i % 1000 == 0)
     	  println("\t"+i+" documents processed.")
       
     	var all = new ListBuffer[String]()
@@ -148,14 +148,14 @@ object Main {
   
   def precision[T](found: Set[T], relevant: Set[T]) : Double = {
     if(found.size == 0){
-      0.0
+      return 0.0
     }
     found.intersect(relevant).size.toDouble / found.size.toDouble
   }
   
   def recall[T](found: Set[T], relevant: Set[T]) : Double = {
     if(relevant.size == 0){
-      0.0
+      return 0.0
     }
     found.intersect(relevant).size.toDouble / relevant.size.toDouble
   }
