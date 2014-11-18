@@ -6,16 +6,17 @@ import ch.ethz.dal.classifier.processing.Tokenizer
 import scala.collection.mutable.ListBuffer
 import java.io.File
 import java.io.FileWriter
+import scala.collection.mutable.HashMap
 
 object Main {
   
-  val TO_TRAIN = Int.MaxValue 
+  /*val TO_TRAIN = Int.MaxValue 
   val TO_TEST = Int.MaxValue
-  val TO_VERIFY = Int.MaxValue
+  val TO_VERIFY = Int.MaxValue*/
   
-  //val TO_TRAIN = 25000
-  //val TO_TEST = 5000
-  //val TO_VERIFY = 5000
+  val TO_TRAIN = 25000
+  val TO_TEST = 5000
+  val TO_VERIFY = 5000
   val ITERATIONS = 2
   
   var cfs : Map[String,Int] = null
@@ -38,11 +39,8 @@ object Main {
     // For each classifier (in parrallel) do x iterations with
     // their (previously given) training data
     println("> Training classifiers")
-    for(clf <- classifiers.par){
-      for(i <- (1 to ITERATIONS)){
-        clf.train(i)
-        println("\t["+clf.getTopic+"] Iteration "+i+" done.")
-      }
+    for(i <- (1 to ITERATIONS)){
+      classifiers.train(i)
     }
     
     // Evaluate on known documents
@@ -69,29 +67,25 @@ object Main {
     	if(i % 1000 == 0)
     	  println("\t"+i+" documents processed.")
       
-    	var all = new ListBuffer[String]()
-    	for(cl <- classifiers){
-    		val choice = cl.classify(doc)
-    		if(choice) all += cl.getTopic
-    		
-    		val reality = doc.topics.contains(cl.getTopic)
-    		def addResult(combo:(Boolean,Boolean)) = combo match {
-    		  case (true,true) => tp = tp + 1
-    		  case (true,false) => fp = fp + 1
-    		  case (false,true) => fn = fn + 1
-    		  case (false,false) => tn = tn + 1
-    		}
-    		addResult(choice,reality)
-    	}
+    	var classified = classifiers.classify(doc)
+    	
+    	val _tp = (classified & doc.topics).size
+    	val _fp = (classified -- doc.topics).size
+    	val _fn = (doc.topics -- classified).size
+    	val _tn = classified.size - _tp - _fp - _fn
+    	
+    	tp = tp + _tp
+    	fp = fp + _fp
+    	fn = fn + _fn
+    	tn = tn + _tn
 
     	// print comparrison
-    	val foundSet = all.toSet
-    	prec = prec + precision(foundSet,doc.topics)
-    	rec = rec + recall(foundSet,doc.topics)
+    	prec = prec + precision(classified,doc.topics)
+    	rec = rec + recall(classified,doc.topics)
     	f1sc = f1sc + f1score(prec,rec)
     	
     	fw.write(doc.ID+" ")
-    	for(clazz <- all){
+    	for(clazz <- classified){
     		fw.write(clazz+" ")
     	}
     	fw.write("\n")
@@ -120,11 +114,7 @@ object Main {
         if(i % 1000 == 0)
     	  println("\t"+i+" documents processed.")
     	  
-    	var all = new ListBuffer[String]()
-    	for(cl <- classifiers){
-    		val choice = cl.classify(doc)
-    		if(choice) all += cl.getTopic
-    	}
+    	var all = classifiers.classify(doc)
     	
     	// print comparrison
     	fw.write(doc.ID+" ")
@@ -160,31 +150,49 @@ object Main {
     found.intersect(relevant).size.toDouble / relevant.size.toDouble
   }
   
-  def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : Iterable[Classifier] = {
+  def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : ClassifierMaster = {
 	if(method.equals("lr")){
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
 	    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
-	    return topics.keys.map(t => new LogisticRegression(t,train)).toList
+	    return new OverPointFiveCM(topics.keys.map(t => new LogisticRegression(t,train)).toList)
 	}else if(method.equals("nb")){
 		// divide docs tfs to different topics by reference, without duplicates
-		val map = scala.collection.mutable.HashMap.empty[String,ListBuffer[(Map[String,Int],Int)]]
+		val map = HashMap.empty[String,HashMap[String,Int]]
+		val length = HashMap.empty[String,Int]
+		val cDocs = HashMap.empty[String,Int]
 		var totDocs = 0
 		for(doc <- iter){
 		  totDocs = totDocs + 1
+		  
+		  if(totDocs % 1000 == 0)
+		    println("\t"+totDocs+" documents processed.")
+		  
 		  val tfs = Utilities.getTermFrequencies(doc)
-		  val tuple = ((tfs,doc.tokens.length))
+		  val dLength = doc.tokens.length
 		  for(topic <- doc.topics){
-		    if(!map.contains(topic))
-		      map(topic) = new ListBuffer[(Map[String,Int],Int)]
-		    map(topic) += tuple
+		    if(!map.contains(topic)){
+		      map(topic) = new HashMap()
+		    }
+		    addAll(map(topic),tfs)
+		    
+		    // increment length and num docs
+		    length(topic) = length.getOrElse(topic, 0) + dLength
+		    cDocs(topic) = cDocs.getOrElse(topic, 0) + 1
 		  }
 		}
 		
 		// give correct set of docs to appropriate classifiers
-		return map.map(kv => new NaiveBayes(kv._1, kv._2, totDocs)).toList
+		// aggregated down to minimum data needed
+		return new TopValueCM(map.keys.map(k => new NaiveBayes(k, map(k).toMap, length(k), cDocs(k), totDocs)))
 	}
-	List() // PLEASE DONT GO HERE :P
+	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
+  }
+  
+  private def addAll(hashmap: HashMap[String,Int], other: Map[String,Int]) = {
+	for(entry <- other){
+		hashmap(entry._1) = hashmap.getOrElse(entry._1 , 0) + entry._2
+	}
   }
   
   def calculateCFS(topics: Map[String,Set[String]]) = {

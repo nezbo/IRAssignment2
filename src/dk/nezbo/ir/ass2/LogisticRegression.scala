@@ -4,14 +4,14 @@ import scala.collection.immutable.Set
 import ch.ethz.dal.classifier.processing.XMLDocument
 import scala.util.Random
 
-class LogisticRegression(topic: String, train: Seq[(Set[String],Array[Double])]) extends Classifier {
+class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Array[Double])]) extends Classifier {
   
   // FIELDS
   
   val bias = 1.0 // TODO: What it should be?
   val random = new Random(1337)
   
-  var theta: Array[Double] = (0 to train(0)._2.length).map(_ => 0.0/*random.nextDouble*/).toArray // TODO: What it should be?
+  var theta: Array[Double] = (0 to trainSet(0)._2.length).map(_ => 0.0/*random.nextDouble*/).toArray // TODO: What it should be?
   
   // INHERITED FUNCTIONS
   
@@ -19,19 +19,19 @@ class LogisticRegression(topic: String, train: Seq[(Set[String],Array[Double])])
     topic
   }
   
-  def train(iteration: Integer) : Unit = {
+  def train(iteration: Int) : Unit = {
     val lRate = 1.0/iteration.toDouble
     
-    for(doc <- train){
+    for(doc <- trainSet){
     	val positive = doc._1.contains(topic)
     	theta = updateTheta(doc._2, theta, lRate, positive)	
     }
 	    
   }
-  def classify(doc: XMLDocument) : Boolean = {
+  def classify(doc: XMLDocument) : Double = {
     val prob = probRelevant(Main.lrFeatures(doc),theta)
     //println("Probability: "+prob)
-    return prob > 0.5
+    prob
   }
   
   override def toString = theta.toList.toString()
