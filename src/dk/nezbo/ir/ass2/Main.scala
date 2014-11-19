@@ -17,7 +17,7 @@ object Main {
   val TO_TRAIN = 25000
   val TO_TEST = 5000
   val TO_VERIFY = 5000
-  val ITERATIONS = 2
+  val ITERATIONS = 5
   
   var cfs : Map[String,Int] = null
 
@@ -53,9 +53,7 @@ object Main {
     println("> Preparing Test data")
     
     val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels").take(TO_TEST)
-    var file = new File("reuter/results/classify-emil-jacobsen-l-"+METHOD+".run")
-    file.getParentFile().mkdir()
-    var fw = new FileWriter(file,true)
+    val sb = new StringBuilder()
     
     // For statistics
     var prec = 0.0
@@ -69,10 +67,11 @@ object Main {
       
     	var classified = classifiers.classify(doc)
     	
-    	val _tp = (classified & doc.topics).size
+    	val _tp = (classified &doc.topics).size
     	val _fp = (classified -- doc.topics).size
     	val _fn = (doc.topics -- classified).size
-    	val _tn = classified.size - _tp - _fp - _fn
+    	val _tn = classifiers.size - _tp - _fp - _fn
+    	
     	
     	tp = tp + _tp
     	fp = fp + _fp
@@ -80,26 +79,35 @@ object Main {
     	tn = tn + _tn
 
     	// print comparrison
-    	prec = prec + precision(classified,doc.topics)
-    	rec = rec + recall(classified,doc.topics)
-    	f1sc = f1sc + f1score(prec,rec)
+    	val _prec = precision(classified,doc.topics)
+    	val _rec = recall(classified,doc.topics)
+    	prec = prec + _prec
+    	rec = rec + _rec
+    	f1sc = f1sc + f1score(_prec,_rec)
     	
-    	fw.write(doc.ID+" ")
+    	sb.append(doc.ID+" ")
     	for(clazz <- classified){
-    		fw.write(clazz+" ")
+    		sb.append(clazz+" ")
     	}
-    	fw.write("\n")
+    	sb.append("\n")
     	
     	i = i + 1
     }
-    fw.write((prec/i.toDouble)+" "+(rec/i.toDouble)+" "+(f1sc/i.toDouble)+"\n")
-    fw.close()
-    
     val total = (tp + tn + fp + fn).toDouble
     println("\nEvaluations: TP="+tp+" TN="+tn+" FP="+fp+" FN="+fn)
     println("accuracy (TP+TN/tot)="+((tp+tn).toDouble/total))
     println("sensitivity (TP/TP+FN)="+(tp.toDouble/(tp.toDouble+fn.toDouble)))
     println("fall-out (FP/FP+TN)="+(fp.toDouble/(fp.toDouble+tn.toDouble)))
+    
+    // Print to file
+    var file = new File("reuter/results/classify-emil-jacobsen-l-"+METHOD+".run")
+    file.getParentFile().mkdir()
+    var fw = new FileWriter(file,true)
+    fw.write((prec/i.toDouble)+" "+(rec/i.toDouble)+" "+(f1sc/i.toDouble)+"\n")
+    fw.write(sb.toString)
+    fw.close()
+    
+
     
     // Classify unknown documents for all topics
     println("> Preparing Validation data")

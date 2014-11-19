@@ -14,10 +14,7 @@ class NaiveBayes(topic: String, totTFS: Map[String,Int], totLength: Int, totCDoc
 	
 	def classify(doc: XMLDocument) : Double = {
 	  val _2 = Utilities.getTermFrequencies(doc).map(kv => kv._2 * logpHatWC(kv._1)).sum
-	  val value = logpHatC + _2
-	  //println(logpHatC +"+"+_2+"="+value)
-	  
-	  value
+	  logpHatC + _2
 	}
 	
 	// HELPERS
