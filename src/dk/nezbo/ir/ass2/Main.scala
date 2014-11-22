@@ -7,6 +7,7 @@ import scala.collection.mutable.ListBuffer
 import java.io.File
 import java.io.FileWriter
 import scala.collection.mutable.HashMap
+import Utilities._
 
 object Main {
   
@@ -17,7 +18,7 @@ object Main {
   val TO_TRAIN = 25000
   val TO_TEST = 5000
   val TO_VERIFY = 5000
-  val ITERATIONS = 5
+  val ITERATIONS = 2
   
   var cfs : Map[String,Int] = null
 
@@ -162,7 +163,7 @@ object Main {
 	if(method.equals("lr")){
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
-	    val train : List[(Set[String],Array[Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+	    val train : List[(Set[String],Map[String,Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
 	    return new OverPointFiveCM(topics.keys.map(t => new LogisticRegression(t,train)).toList)
 	}else if(method.equals("nb")){
 		// divide docs tfs to different topics by reference, without duplicates
@@ -206,31 +207,21 @@ object Main {
   def calculateCFS(topics: Map[String,Set[String]]) = {
     var iter = new ReutersCorpusIterator("./reuter/data/train").take(TO_TRAIN)
     var num_docs = 0
-    val keywords = topics.flatMap(t => t._2).toSet
-    println(keywords)
     
     val cfs = scala.collection.mutable.Map[String, Int]()
     println("> Creating CFs")
     for(doc <- iter){
       num_docs = num_docs + 1
-      cfs ++= Utilities.getTermFrequencies(doc).filter(t => keywords.contains(t._1)).map(c => (c._1  -> (1 + cfs.getOrElse(c._1, 0))))
+      cfs ++= Utilities.getTermFrequencies(doc).map(c => (c._1  -> (1 + cfs.getOrElse(c._1, 0))))
       
-      if(num_docs % 1000 == 0) println(num_docs + " docs handled")
+      if(num_docs % 1000 == 0) println(num_docs + " docs handled - size: "+cfs.size)
     }
-    println("cfs: "+cfs)
+    //println("cfs: "+cfs)
     cfs.toMap
   }
   
   def getTopicCounts(docs: List[XMLDocument]) : Map[String,Double] = {
 	  docs.flatMap(d => d.topics).groupBy(identity).mapValues(v => v.length.toDouble / docs.length.toDouble)
-  }
-  
-  def tfidf(tf: Int, df: Int, docs: Int) = {
-    (1+Math.log10(tf)) * idf(df,docs)
-  }
-  
-  def idf(df: Int, n: Int) = {
-    Math.log(n) - Math.log(df)
   }
   
   def loadTopics() : Map[String,Set[String]] = {
@@ -248,9 +239,10 @@ object Main {
     result.toMap
   }
   
-  def lrFeatures(doc: XMLDocument) : Array[Double] = {
-    val tfs = Utilities.getTermFrequencies(doc)
-	cfs.map(kv => Math.max(0.0 ,Main.tfidf(tfs.getOrElse(kv._1,0),kv._2, 200000))).toArray
+  def lrFeatures(doc: XMLDocument) : Map[String,Double] = {
+    val result = Utilities.getTermFrequencies(doc).map(t => ((t._1, Utilities.tfidf(t._2 , cfs.getOrElse(t._1, 0), 200000) )) ).toSeq.sortBy(t => -t._2).take(50).toMap
+    //.top(50,t => t._2).toMap
+    result
   }
 
 }
