@@ -194,11 +194,14 @@ object Main {
 		  }
 		}
 		
-		println(vocabulary.size)
-		
 		// give correct set of docs to appropriate classifiers
 		// aggregated down to minimum data needed
-		return new TopValueCM(map.keys.map(k => new NaiveBayes(k, map(k).toMap, length(k), cDocs(k), totDocs, vocabulary.size)))
+		return new TopValueCM(3,map.keys.map(k => new NaiveBayes(k, map(k).toMap, length(k), cDocs(k), totDocs, vocabulary.size)))
+	} else if(method.equals("svm")) {
+	    // get idf values (for topic descriptions)
+	    cfs = calculateCFS(topics)
+	    val train : List[(Set[String],Map[String,Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+	    return new OverPointFiveCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
 	}
 	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
   }

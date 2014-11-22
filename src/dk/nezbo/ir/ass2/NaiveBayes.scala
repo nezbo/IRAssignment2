@@ -2,8 +2,9 @@ package dk.nezbo.ir.ass2
 
 import ch.ethz.dal.classifier.processing.XMLDocument
 
-class NaiveBayes(topic: String, totTFS: Map[String,Int], totLength: Int, totCDocs: Int, totDocs: Int) extends Classifier {
+class NaiveBayes(topic: String, totTFS: Map[String,Int], totLength: Int, totCDocs: Int, totDocs: Int, vocSize: Int) extends Classifier {
 	
+	def alpha = 1.0
 	def logpHatC = Math.log10(totCDocs.toDouble / totDocs.toDouble)
   
 	def getTopic() : String = {
@@ -20,11 +21,9 @@ class NaiveBayes(topic: String, totTFS: Map[String,Int], totLength: Int, totCDoc
 	// HELPERS
 	
 	private def logpHatWC(word: String) : Double = {
-	  val result = totTFS.getOrElse(word, 0).toDouble / totLength
+	  val top = totTFS.getOrElse(word, 0).toDouble + alpha
+	  val bottom = totLength + alpha * vocSize
 	  
-	  if(result > 0.0){
-	    return Math.log10(result)
-	  }
-	  0.0
+	  top / bottom
 	}
 }

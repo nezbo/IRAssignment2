@@ -10,7 +10,6 @@ class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Do
   // FIELDS
   
   val bias = 1.0 // TODO: What it should be?
-  val random = new Random(1337)
   
   var theta: HashMap[String,Double] = HashMap[String,Double]()
   
@@ -20,13 +19,11 @@ class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Do
     topic
   }
   
-  def train(iteration: Int) : Unit = {
-    val lRate = 1.0/iteration.toDouble
-    
+  def train(iteration: Int) : Unit = {    
     for(doc <- trainSet){
     	//println("["+topic+"] theta size: "+theta.size)
     	val positive = doc._1.contains(topic)
-    	updateTheta(doc._2, theta, lRate, positive)	
+    	updateTheta(doc._2, theta, iteration, positive)	
     }
     //println("["+topic+"] theta size: "+theta.size)
 	    
@@ -39,39 +36,47 @@ class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Do
   
   override def toString = theta.toList.toString()
   
+  // NEW FUNCTIONS
+  
+  def updateTheta(doc: Map[String,Double], theta: HashMap[String,Double], step: Int, rel: Boolean) = {
+    vectorAdd(scalarMultVector(1.0/step.toDouble, deltaTheta(doc,theta,rel)), theta)
+  }
+  
   // HELPER FUNCTIONS
   
-  def innerProduct(v1: Map[String,Double], v2: HashMap[String,Double]) : Double = {
+  protected def innerProduct(v1: Map[String,Double], v2: HashMap[String,Double]) : Double = {
     (v1.keySet & v2.keySet).map(k => (v1.getOrElse(k, 0.0) * v2.getOrElse(k, 0.0))).sum
   }
   
-  def probRelevant(dFeature: Map[String,Double], theta: HashMap[String,Double]) : Double = {
-    val result = 1.0 / (1.0 + Math.exp(-1.0 * bias - innerProduct(dFeature,theta)))
-    //println(result)
-    result
+  private def probRelevant(dFeature: Map[String,Double], theta: HashMap[String,Double]) : Double = {
+    1.0 / (1.0 + Math.exp(-1.0 * bias - innerProduct(dFeature,theta)))
   }
   
-  def scalarMultVector(scalar: Double, vector: Map[String,Double]) : Map[String,Double] = {
+  protected def scalarMultVector(scalar: Double, vector: Map[String,Double]) : Map[String,Double] = {
     vector.mapValues(i => i*scalar)
   }
   
-  def vectorAdd(v1: Map[String,Double], theta: HashMap[String,Double]) = {
+  // Maybe not necessary
+  protected def scalarMultVector(scalar: Double, vector: HashMap[String,Double]) : Map[String,Double] = {
+    vector.map(kv => ((kv._1 -> (kv._2 * scalar)))).toMap
+  }
+  
+  protected def vectorAdd(v1: Map[String,Double], theta: HashMap[String,Double]) = {
     for(key <- (v1.keySet)){
       theta(key) = theta.getOrElseUpdate(key, 0.0) + v1(key)
     }
-    //(v1.keySet ++ v2.keySet).map(k => ((k -> (v1.getOrElse(k, 0.0) + v2.getOrElse(k, 0.0)) )) ).toMap
   }
   
-  def deltaTheta(dFeature: Map[String,Double], theta: HashMap[String,Double], rel: Boolean) : Map[String,Double] = {
+  protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
+    (v1.keySet ++ v2.keySet).map(k => ((k -> (v1.getOrElse(k, 0.0) + v2.getOrElse(k, 0.0))))).toMap
+  }
+  
+  private def deltaTheta(dFeature: Map[String,Double], theta: HashMap[String,Double], rel: Boolean) : Map[String,Double] = {
     if(rel){
       scalarMultVector(1.0 - probRelevant(dFeature,theta), dFeature)
     }else{
       scalarMultVector(-1.0*probRelevant(dFeature,theta), dFeature)
     }
-  }
-  
-  def updateTheta(doc: Map[String,Double], theta: HashMap[String,Double], lRate: Double, rel: Boolean) = {
-    vectorAdd(scalarMultVector(lRate, deltaTheta(doc,theta,rel)), theta)
   }
 
 }

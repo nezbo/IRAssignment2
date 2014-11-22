@@ -14,10 +14,10 @@ abstract class ClassifierMaster(minions: Iterable[Classifier]) {
 	def classify(doc: XMLDocument) : Set[String]
 }
 
-class TopValueCM(minions: Iterable[Classifier]) extends ClassifierMaster(minions: Iterable[Classifier]) {
+class TopValueCM(toTake: Int, minions: Iterable[Classifier]) extends ClassifierMaster(minions: Iterable[Classifier]) {
   
 	def classify(doc: XMLDocument) : Set[String] = {
-	  Set(minions.map(m => ((m.getTopic, m.classify(doc))) ).maxBy(_._2)._1)
+	  minions.map(m => ((m.getTopic, m.classify(doc))) ).toList.sortBy(-_._2).take(toTake).map(_._1).toSet
 	}
 }
 
