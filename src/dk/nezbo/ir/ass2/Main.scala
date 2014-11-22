@@ -8,6 +8,7 @@ import java.io.File
 import java.io.FileWriter
 import scala.collection.mutable.HashMap
 import Utilities._
+import scala.collection.mutable.HashSet
 
 object Main {
   
@@ -171,6 +172,7 @@ object Main {
 		val length = HashMap.empty[String,Int]
 		val cDocs = HashMap.empty[String,Int]
 		var totDocs = 0
+		var vocabulary : HashSet[String] = HashSet()
 		for(doc <- iter){
 		  totDocs = totDocs + 1
 		  
@@ -178,6 +180,7 @@ object Main {
 		    println("\t"+totDocs+" documents processed.")
 		  
 		  val tfs = Utilities.getTermFrequencies(doc)
+		  vocabulary ++= tfs.keySet
 		  val dLength = doc.tokens.length
 		  for(topic <- doc.topics){
 		    if(!map.contains(topic)){
@@ -191,9 +194,11 @@ object Main {
 		  }
 		}
 		
+		println(vocabulary.size)
+		
 		// give correct set of docs to appropriate classifiers
 		// aggregated down to minimum data needed
-		return new TopValueCM(map.keys.map(k => new NaiveBayes(k, map(k).toMap, length(k), cDocs(k), totDocs)))
+		return new TopValueCM(map.keys.map(k => new NaiveBayes(k, map(k).toMap, length(k), cDocs(k), totDocs, vocabulary.size)))
 	}
 	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
   }
@@ -241,7 +246,6 @@ object Main {
   
   def lrFeatures(doc: XMLDocument) : Map[String,Double] = {
     val result = Utilities.getTermFrequencies(doc).map(t => ((t._1, Utilities.tfidf(t._2 , cfs.getOrElse(t._1, 0), 200000) )) ).toSeq.sortBy(t => -t._2).take(50).toMap
-    //.top(50,t => t._2).toMap
     result
   }
 

@@ -49,7 +49,7 @@ object Utilities {
         priority += item
         priority.dequeue
       }
-      priority.toSeq
+      priority.toList.sortBy(lambda)
     }
 	}
   	
