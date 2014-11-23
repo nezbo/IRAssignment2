@@ -12,14 +12,10 @@ import scala.collection.mutable.HashSet
 
 object Main {
   
-  /*val TO_TRAIN = Int.MaxValue 
+  val TO_TRAIN = 150000
   val TO_TEST = Int.MaxValue
-  val TO_VERIFY = Int.MaxValue*/
-  
-  val TO_TRAIN = 25000
-  val TO_TEST = 5000
-  val TO_VERIFY = 5000
-  val ITERATIONS = 2
+  val TO_VERIFY = Int.MaxValue
+  val ITERATIONS = 20
   
   var cfs : Map[String,Int] = null
 
@@ -33,7 +29,7 @@ object Main {
     
     // Load documents for transformation
     println("> Preparing Training data")
-    val iter = new ReutersCorpusIterator("./reuter/data/train").take(TO_TRAIN)
+    var iter = new ReutersCorpusIterator("./reuter/data/train")
     
     // Initialize classifiers (per topic)
     val classifiers = getClassifiers(METHOD, topicDefs, iter)
@@ -54,7 +50,7 @@ object Main {
     println()
     println("> Preparing Test data")
     
-    val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels").take(TO_TEST)
+    val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels")
     val sb = new StringBuilder()
     
     // For statistics
@@ -63,7 +59,10 @@ object Main {
     var f1sc = 0.0
     
     println("> Test set comparrison started.")
-    for(doc <- test_docs){
+    var doc : XMLDocument = null
+    while(test_docs.hasNext && i < TO_TEST){
+    	doc = test_docs.next
+    	
     	if(i % 1000 == 0)
     	  println("\t"+i+" documents processed.")
       
@@ -113,14 +112,16 @@ object Main {
     
     // Classify unknown documents for all topics
     println("> Preparing Validation data")
-    val verification_docs = new ReutersCorpusIterator("./reuter/data/test-without-labels").take(TO_VERIFY)
+    val verification_docs = new ReutersCorpusIterator("./reuter/data/test-without-labels")
     file = new File("reuter/results/classify-emil-jacobsen-u-"+METHOD+".run")
     file.getParentFile().mkdir()
     fw = new FileWriter(file,true)
     
     println("> Validation set classification started.")
     i = 0
-    for(doc <- verification_docs){
+    while(verification_docs.hasNext && i < TO_VERIFY){
+    	doc = verification_docs.next
+    	
         if(i % 1000 == 0)
     	  println("\t"+i+" documents processed.")
     	  
@@ -164,7 +165,19 @@ object Main {
 	if(method.equals("lr")){
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
-	    val train : List[(Set[String],Map[String,Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+	    
+	    println("> Finally building Training Set")
+	    val train = new ListBuffer[(Set[String],Map[String,Double])]
+	    var d : XMLDocument = null
+	    var i = 0
+	    while(iter.hasNext && i < TO_TRAIN){
+	      d = iter.next
+
+	      
+	      train += ((d.topics, lrFeatures(d)))
+	      i = i + 1
+	    }
+	    //val train : List[(Set[String],Map[String,Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
 	    return new OverPointFiveCM(topics.keys.map(t => new LogisticRegression(t,train)).toList)
 	}else if(method.equals("nb")){
 		// divide docs tfs to different topics by reference, without duplicates
@@ -173,7 +186,10 @@ object Main {
 		val cDocs = HashMap.empty[String,Int]
 		var totDocs = 0
 		var vocabulary : HashSet[String] = HashSet()
-		for(doc <- iter){
+		
+		var doc : XMLDocument = null
+		while(iter.hasNext && totDocs < TO_TRAIN){
+		  doc = iter.next
 		  totDocs = totDocs + 1
 		  
 		  if(totDocs % 1000 == 0)
@@ -213,12 +229,14 @@ object Main {
   }
   
   def calculateCFS(topics: Map[String,Set[String]]) = {
-    var iter = new ReutersCorpusIterator("./reuter/data/train").take(TO_TRAIN)
+    var iter = new ReutersCorpusIterator("./reuter/data/train")
     var num_docs = 0
     
     val cfs = scala.collection.mutable.Map[String, Int]()
     println("> Creating CFs")
-    for(doc <- iter){
+    var doc : XMLDocument = null
+    while(iter.hasNext && num_docs < TO_TRAIN){
+      doc = iter.next
       num_docs = num_docs + 1
       cfs ++= Utilities.getTermFrequencies(doc).map(c => (c._1  -> (1 + cfs.getOrElse(c._1, 0))))
       
@@ -248,7 +266,12 @@ object Main {
   }
   
   def lrFeatures(doc: XMLDocument) : Map[String,Double] = {
-    val result = Utilities.getTermFrequencies(doc).map(t => ((t._1, Utilities.tfidf(t._2 , cfs.getOrElse(t._1, 0), 200000) )) ).toSeq.sortBy(t => -t._2).take(50).toMap
+    val result = Utilities.getTermFrequencies(doc)
+    		.map(t => ((t._1, Utilities.tfidf(t._2 , cfs.getOrElse(t._1, 0), 200000) )) )
+    		.toSeq
+    		.sortBy(t => -t._2)
+    		.take(50)
+    		.toMap
     result
   }
 

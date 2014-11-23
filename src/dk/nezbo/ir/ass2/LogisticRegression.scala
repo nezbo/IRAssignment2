@@ -57,9 +57,9 @@ class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Do
   }
   
   // Maybe not necessary
-  protected def scalarMultVector(scalar: Double, vector: HashMap[String,Double]) : Map[String,Double] = {
+  /*protected def scalarMultVector(scalar: Double, vector: HashMap[String,Double]) : Map[String,Double] = {
     vector.map(kv => ((kv._1 -> (kv._2 * scalar)))).toMap
-  }
+  }*/
   
   protected def vectorAdd(v1: Map[String,Double], theta: HashMap[String,Double]) = {
     for(key <- (v1.keySet)){
@@ -67,9 +67,9 @@ class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Do
     }
   }
   
-  protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
+  /*protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
     (v1.keySet ++ v2.keySet).map(k => ((k -> (v1.getOrElse(k, 0.0) + v2.getOrElse(k, 0.0))))).toMap
-  }
+  }*/
   
   private def deltaTheta(dFeature: Map[String,Double], theta: HashMap[String,Double], rel: Boolean) : Map[String,Double] = {
     if(rel){
