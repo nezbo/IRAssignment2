@@ -3,10 +3,12 @@ package dk.nezbo.ir.ass2
 import ch.ethz.dal.classifier.processing.XMLDocument
 
 abstract class ClassifierMaster(minions: Iterable[Classifier]) {
-	def train(iteration: Int) : Unit = {
+	def train(numIterations: Int) : Unit = {
 	  for(m <- minions.par){
-	    m.train(iteration)
-	    println("\t["+m.getTopic+"] Iteration "+iteration+" done.")
+	    for(i <- (1 to numIterations)){
+		    m.train(i)
+		    println("\t["+m.getTopic+"] Iteration "+i+" done.")
+	    }
 	  }
 	}
 	def size = minions.size

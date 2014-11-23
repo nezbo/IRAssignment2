@@ -12,7 +12,7 @@ import scala.collection.mutable.HashSet
 
 object Main {
   
-  val TO_TRAIN = 150000
+  val TO_TRAIN = 100000
   val TO_TEST = Int.MaxValue
   val TO_VERIFY = Int.MaxValue
   val ITERATIONS = 20
@@ -37,9 +37,7 @@ object Main {
     // For each classifier (in parrallel) do x iterations with
     // their (previously given) training data
     println("> Training classifiers")
-    for(i <- (1 to ITERATIONS)){
-      classifiers.train(i)
-    }
+    classifiers.train(ITERATIONS)
     
     // Evaluate on known documents
     var i = 0
