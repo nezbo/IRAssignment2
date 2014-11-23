@@ -12,10 +12,10 @@ import scala.collection.mutable.HashSet
 
 object Main {
   
-  val TO_TRAIN = 100000
+  val TO_TRAIN = 5000
   val TO_TEST = Int.MaxValue
   val TO_VERIFY = Int.MaxValue
-  val ITERATIONS = 20
+  val ITERATIONS = 2
   
   var cfs : Map[String,Int] = null
 
@@ -165,17 +165,7 @@ object Main {
 	    cfs = calculateCFS(topics)
 	    
 	    println("> Finally building Training Set")
-	    val train = new ListBuffer[(Set[String],Map[String,Double])]
-	    var d : XMLDocument = null
-	    var i = 0
-	    while(iter.hasNext && i < TO_TRAIN){
-	      d = iter.next
-
-	      
-	      train += ((d.topics, lrFeatures(d)))
-	      i = i + 1
-	    }
-	    //val train : List[(Set[String],Map[String,Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+	    val train = takeTransform(iter,TO_TRAIN,d => ((d.topics, lrFeatures(d))) )
 	    return new OverPointFiveCM(topics.keys.map(t => new LogisticRegression(t,train)).toList)
 	}else if(method.equals("nb")){
 		// divide docs tfs to different topics by reference, without duplicates
@@ -214,10 +204,22 @@ object Main {
 	} else if(method.equals("svm")) {
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
-	    val train : List[(Set[String],Map[String,Double])] = iter.map(d => ((d.topics, lrFeatures(d))) ).toList
+	    val train = takeTransform(iter,TO_TRAIN,d => ((d.topics, lrFeatures(d))) )
 	    return new OverPointFiveCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
 	}
 	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
+  }
+  
+  private def takeTransform[T](iter: Iterator[XMLDocument], amount: Int, transform: XMLDocument => T) : Iterable[T] = {
+	val train = new ListBuffer[T]
+	var doc : XMLDocument = null
+	var i = 0
+	while(iter.hasNext && i < amount){
+	  doc = iter.next
+	  train += transform(doc)
+	  i = i + 1
+	}
+	train
   }
   
   private def addAll(hashmap: HashMap[String,Int], other: Map[String,Int]) = {

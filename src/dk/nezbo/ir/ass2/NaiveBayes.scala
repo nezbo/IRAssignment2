@@ -2,16 +2,13 @@ package dk.nezbo.ir.ass2
 
 import ch.ethz.dal.classifier.processing.XMLDocument
 
-class NaiveBayes(topic: String, totTFS: Map[String,Int], totLength: Int, totCDocs: Int, totDocs: Int, vocSize: Int) extends Classifier {
+class NaiveBayes(topic: String, totTFS: Map[String,Int], totLength: Int, totCDocs: Int, totDocs: Int, vocSize: Int) extends Classifier(topic:String) {
 	
 	def alpha = 1.0
 	def logpHatC = Math.log10(totCDocs.toDouble / totDocs.toDouble)
   
-	def getTopic() : String = {
-	  topic
-	}
-  
 	def train(iteration: Int) : Unit = {}
+	def clearTrain = {}
 	
 	def classify(doc: XMLDocument) : Double = {
 	  val _2 = Utilities.getTermFrequencies(doc).map(kv => kv._2 * logpHatWC(kv._1)).sum

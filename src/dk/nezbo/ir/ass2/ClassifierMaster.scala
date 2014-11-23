@@ -9,6 +9,7 @@ abstract class ClassifierMaster(minions: Iterable[Classifier]) {
 		    m.train(i)
 		    println("\t["+m.getTopic+"] Iteration "+i+" done.")
 	    }
+	    m.clearTrain
 	  }
 	}
 	def size = minions.size

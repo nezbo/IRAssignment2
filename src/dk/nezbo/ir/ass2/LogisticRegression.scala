@@ -5,25 +5,27 @@ import ch.ethz.dal.classifier.processing.XMLDocument
 import scala.util.Random
 import scala.collection.mutable.HashMap
 
-class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Double])]) extends Classifier {
+class LogisticRegression(topic: String, var trainSet: Iterable[(Set[String],Map[String,Double])]) extends Classifier(topic:String) {
   
   // FIELDS
   
   val bias = 1.0 // TODO: What it should be?
+  protected var debugPrint = false
   
   var theta: HashMap[String,Double] = HashMap[String,Double]()
   
   // INHERITED FUNCTIONS
   
-  def getTopic() : String = {
-    topic
-  }
+  def clearTrain = trainSet = null
   
-  def train(iteration: Int) : Unit = {    
+  def train(iteration: Int) : Unit = {
+    var d = 0
     for(doc <- trainSet){
-    	//println("["+topic+"] theta size: "+theta.size)
+    	if(debugPrint & d % 1000 == 0) println("\t\t["+topic+"] doc: "+d+", theta size: "+theta.size)
+    	
     	val positive = doc._1.contains(topic)
-    	updateTheta(doc._2, theta, iteration, positive)	
+    	updateTheta(doc._2, theta, iteration, positive)
+    	d = d + 1
     }
     //println("["+topic+"] theta size: "+theta.size)
 	    
@@ -56,20 +58,11 @@ class LogisticRegression(topic: String, trainSet: Seq[(Set[String],Map[String,Do
     vector.mapValues(i => i*scalar)
   }
   
-  // Maybe not necessary
-  /*protected def scalarMultVector(scalar: Double, vector: HashMap[String,Double]) : Map[String,Double] = {
-    vector.map(kv => ((kv._1 -> (kv._2 * scalar)))).toMap
-  }*/
-  
   protected def vectorAdd(v1: Map[String,Double], theta: HashMap[String,Double]) = {
     for(key <- (v1.keySet)){
       theta(key) = theta.getOrElseUpdate(key, 0.0) + v1(key)
     }
   }
-  
-  /*protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
-    (v1.keySet ++ v2.keySet).map(k => ((k -> (v1.getOrElse(k, 0.0) + v2.getOrElse(k, 0.0))))).toMap
-  }*/
   
   private def deltaTheta(dFeature: Map[String,Double], theta: HashMap[String,Double], rel: Boolean) : Map[String,Double] = {
     if(rel){
