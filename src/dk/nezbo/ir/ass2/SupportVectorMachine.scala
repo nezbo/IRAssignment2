@@ -9,23 +9,26 @@ class SupportVectorMachine(topic: String, trainSet: Iterable[(Set[String],Map[St
 
   override def updateTheta(doc: Map[String,Double], theta: HashMap[String,Double], step: Int, rel: Boolean) = {
     val lambda = 1.0
-    val thetaShrink = scalarMultVector(1-1.0/step.toDouble, theta) // WARNING
-    val positive = if(rel) 1 else -1
-    val margin = 1.0 - positive * this.innerProduct(doc, theta)
+    val isClass = if(rel) 1 else -1
+    val innerProduct = doc.map(kv => kv._2 * theta.getOrElse(kv._1, 0.0)).sum
     
-    if(margin <= 0){
-      this.vectorAdd(thetaShrink, theta)
-    }else {
-      this.vectorAdd(this.vectorAddImmut(thetaShrink,this.scalarMultVector(1.0 / (lambda * step)*positive,doc)),theta)
+    val multBy = 1.0 - 1.0 / step.toDouble
+    // shrinking
+    theta ++= theta.map(kv => kv._1 -> kv._2 * multBy)
+    
+    val margin = 1.0 - isClass * innerProduct
+    if(margin > 0){
+      val factor = (1.0 / (lambda * step)) * isClass
+      theta ++= doc.map(kv => kv._1 -> (theta.getOrElse(kv._1, 0.0) + kv._2 * factor))
     }
   }
   
-  protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
+  /*protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
     (v1.keySet ++ v2.keySet).map(k => ((k -> (v1.getOrElse(k, 0.0) + v2.getOrElse(k, 0.0))))).toMap
   }
   
   // Maybe not necessary
   protected def scalarMultVector(scalar: Double, vector: HashMap[String,Double]) : Map[String,Double] = {
     vector.map(kv => ((kv._1 -> (kv._2 * scalar)))).toMap
-  }
+  }*/
 }

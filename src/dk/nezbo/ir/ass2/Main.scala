@@ -205,7 +205,7 @@ object Main {
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
 	    val train = takeTransform(iter,TO_TRAIN,d => ((d.topics, lrFeatures(d))) )
-	    return new OverPointFiveCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
+	    return new OverAverageCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
 	}
 	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
   }
