@@ -5,11 +5,15 @@ import ch.ethz.dal.classifier.processing.XMLDocument
 import scala.util.Random
 import scala.collection.mutable.HashMap
 
+object LogisticRegression{
+  val classifyCache = new HashMap[Int, Map[String,Double]]()
+}
+
 class LogisticRegression(topic: String, var trainSet: Iterable[(Set[String],Map[String,Double])]) extends Classifier(topic:String) {
   
   // FIELDS
   
-  val bias = 1.0 // TODO: What it should be?
+  val bias = 1.0
   protected var debugPrint = false
   
   var theta: HashMap[String,Double] = HashMap[String,Double]()
@@ -21,7 +25,7 @@ class LogisticRegression(topic: String, var trainSet: Iterable[(Set[String],Map[
   def train(iteration: Int) : Unit = {
     var d = 0
     for(doc <- trainSet){
-    	if(debugPrint & d % 1000 == 0) println("\t\t["+topic+"] doc: "+d+", theta size: "+theta.size)
+    	if(debugPrint & d % 10000 == 0) println("\t\t["+topic+"] doc: "+d+", theta size: "+theta.size)
     	
     	val positive = doc._1.contains(topic)
     	updateTheta(doc._2, theta, iteration, positive)
@@ -31,7 +35,7 @@ class LogisticRegression(topic: String, var trainSet: Iterable[(Set[String],Map[
 	    
   }
   def classify(doc: XMLDocument) : Double = {
-    val prob = probRelevant(Main.lrFeatures(doc),theta)
+    val prob = probRelevant(LogisticRegression.classifyCache.getOrElseUpdate(doc.ID, Main.lrFeatures(doc)),theta)
     //println("Probability: "+prob)
     prob
   }

@@ -12,14 +12,15 @@ import scala.collection.mutable.HashSet
 
 object Main {
   
-  val TO_TRAIN = 5000
+  val TO_TRAIN = 1000
   val TO_TEST = Int.MaxValue
   val TO_VERIFY = Int.MaxValue
-  val ITERATIONS = 2
+  val ITERATIONS = 20
   
   var cfs : Map[String,Int] = null
 
   def main(args: Array[String]): Unit = {
+    val timer = new StopWatch
     val METHOD = args(0)
     
     // load topics and definitions
@@ -34,10 +35,14 @@ object Main {
     // Initialize classifiers (per topic)
     val classifiers = getClassifiers(METHOD, topicDefs, iter)
     
+    timer.tick
+    
     // For each classifier (in parrallel) do x iterations with
     // their (previously given) training data
     println("> Training classifiers")
     classifiers.train(ITERATIONS)
+    
+    timer.tick
     
     // Evaluate on known documents
     var i = 0
@@ -50,6 +55,8 @@ object Main {
     
     val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels")
     val sb = new StringBuilder()
+    
+    timer.tick
     
     // For statistics
     var prec = 0.0
@@ -98,6 +105,8 @@ object Main {
     println("sensitivity (TP/TP+FN)="+(tp.toDouble/(tp.toDouble+fn.toDouble)))
     println("fall-out (FP/FP+TN)="+(fp.toDouble/(fp.toDouble+tn.toDouble)))
     
+    timer.tick
+    
     // Print to file
     var file = new File("reuter/results/classify-emil-jacobsen-l-"+METHOD+".run")
     file.getParentFile().mkdir()
@@ -114,6 +123,8 @@ object Main {
     file = new File("reuter/results/classify-emil-jacobsen-u-"+METHOD+".run")
     file.getParentFile().mkdir()
     fw = new FileWriter(file,true)
+    
+    timer.tick
     
     println("> Validation set classification started.")
     i = 0
@@ -136,6 +147,8 @@ object Main {
     }
     fw.close()
     println("> Everything done.")
+    
+    timer.tick
   }
   
   def f1score(prec: Double, recall: Double) : Double = {
@@ -205,7 +218,7 @@ object Main {
 	    // get idf values (for topic descriptions)
 	    cfs = calculateCFS(topics)
 	    val train = takeTransform(iter,TO_TRAIN,d => ((d.topics, lrFeatures(d))) )
-	    return new OverAverageCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
+	    return new OverPointFiveCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
 	}
 	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
   }
