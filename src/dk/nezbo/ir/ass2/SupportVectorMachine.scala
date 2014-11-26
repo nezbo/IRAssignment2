@@ -2,8 +2,8 @@ package dk.nezbo.ir.ass2
 
 import scala.collection.mutable.HashMap
 
-class SupportVectorMachine(topic: String, trainSet: Iterable[(Set[String],Map[String,Double])]) 
-	extends LogisticRegression(topic: String, trainSet: Iterable[(Set[String],Map[String,Double])]) {
+class SupportVectorMachine(topic: String, trainPos: Seq[Map[String,Double]], trainNeg: Seq[Map[String,Double]]) 
+	extends LogisticRegression(topic: String, trainPos: Seq[Map[String,Double]], trainNeg: Seq[Map[String,Double]]) {
   
   //this.debugPrint = true
 
@@ -22,13 +22,4 @@ class SupportVectorMachine(topic: String, trainSet: Iterable[(Set[String],Map[St
       theta ++= doc.map(kv => kv._1 -> (theta.getOrElse(kv._1, 0.0) + kv._2 * factor))
     }
   }
-  
-  /*protected def vectorAddImmut(v1: Map[String,Double], v2: Map[String,Double]) : Map[String,Double] = {
-    (v1.keySet ++ v2.keySet).map(k => ((k -> (v1.getOrElse(k, 0.0) + v2.getOrElse(k, 0.0))))).toMap
-  }
-  
-  // Maybe not necessary
-  protected def scalarMultVector(scalar: Double, vector: HashMap[String,Double]) : Map[String,Double] = {
-    vector.map(kv => ((kv._1 -> (kv._2 * scalar)))).toMap
-  }*/
 }

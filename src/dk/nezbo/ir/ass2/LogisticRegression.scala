@@ -9,10 +9,11 @@ object LogisticRegression{
   val classifyCache = new HashMap[Int, Map[String,Double]]()
 }
 
-class LogisticRegression(topic: String, var trainSet: Iterable[(Set[String],Map[String,Double])]) extends Classifier(topic:String) {
+class LogisticRegression(topic: String, var trainPos: Seq[Map[String,Double]], var trainNeg: Seq[Map[String,Double]]) extends Classifier(topic:String) {
   
   // FIELDS
   
+  val rand = new Random
   val bias = 1.0
   protected var debugPrint = false
   
@@ -20,19 +21,11 @@ class LogisticRegression(topic: String, var trainSet: Iterable[(Set[String],Map[
   
   // INHERITED FUNCTIONS
   
-  def clearTrain = trainSet = null
-  
   def train(iteration: Int) : Unit = {
-    var d = 0
-    for(doc <- trainSet){
-    	if(debugPrint & d % 10000 == 0) println("\t\t["+topic+"] doc: "+d+", theta size: "+theta.size)
-    	
-    	val positive = doc._1.contains(topic)
-    	updateTheta(doc._2, theta, iteration, positive)
-    	d = d + 1
-    }
-    //println("["+topic+"] theta size: "+theta.size)
-	    
+	val positive = rand.nextBoolean
+    val doc = if(positive) trainPos(rand.nextInt(trainPos.size)) else trainNeg(rand.nextInt(trainNeg.size))
+    
+	updateTheta(doc, theta, iteration, positive)	    
   }
   def classify(doc: XMLDocument) : Double = {
     val prob = probRelevant(LogisticRegression.classifyCache.getOrElseUpdate(doc.ID, Main.lrFeatures(doc)),theta)

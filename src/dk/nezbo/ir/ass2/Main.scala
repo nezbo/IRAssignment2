@@ -12,19 +12,23 @@ import scala.collection.mutable.HashSet
 
 object Main {
   
-  val TO_TRAIN = 1000
+  val TO_TRAIN = Int.MaxValue
   val TO_TEST = Int.MaxValue
   val TO_VERIFY = Int.MaxValue
-  val ITERATIONS = 20
+  val ITERATIONS = 10000
   
   var cfs : Map[String,Int] = null
 
   def main(args: Array[String]): Unit = {
-    val timer = new StopWatch
+    StopWatch.start
     val METHOD = args(0)
     
+    println("> Loading topics")
+    
     // load topics and definitions
-    val topicDefs : Map[String,Set[String]] = loadTopics()
+    val topicDefs : Set[String] = loadTopics()
+    
+    StopWatch.tick
     
     println(topicDefs)
     
@@ -35,14 +39,14 @@ object Main {
     // Initialize classifiers (per topic)
     val classifiers = getClassifiers(METHOD, topicDefs, iter)
     
-    timer.tick
+    StopWatch.tick
     
     // For each classifier (in parrallel) do x iterations with
     // their (previously given) training data
     println("> Training classifiers")
     classifiers.train(ITERATIONS)
     
-    timer.tick
+    StopWatch.tick
     
     // Evaluate on known documents
     var i = 0
@@ -56,7 +60,7 @@ object Main {
     val test_docs = new ReutersCorpusIterator("./reuter/data/test-with-labels")
     val sb = new StringBuilder()
     
-    timer.tick
+    StopWatch.tick
     
     // For statistics
     var prec = 0.0
@@ -105,7 +109,7 @@ object Main {
     println("sensitivity (TP/TP+FN)="+(tp.toDouble/(tp.toDouble+fn.toDouble)))
     println("fall-out (FP/FP+TN)="+(fp.toDouble/(fp.toDouble+tn.toDouble)))
     
-    timer.tick
+    StopWatch.tick
     
     // Print to file
     var file = new File("reuter/results/classify-emil-jacobsen-l-"+METHOD+".run")
@@ -124,7 +128,7 @@ object Main {
     file.getParentFile().mkdir()
     fw = new FileWriter(file,true)
     
-    timer.tick
+    StopWatch.tick
     
     println("> Validation set classification started.")
     i = 0
@@ -148,7 +152,29 @@ object Main {
     fw.close()
     println("> Everything done.")
     
-    timer.tick
+    StopWatch.tick
+    StopWatch.stop
+  }
+  
+  def docsToSets(iter: Iterator[XMLDocument], allTopics: Set[String]) : HashMap[String,(ListBuffer[Map[String,Double]],ListBuffer[Map[String,Double]])] = {
+    val result = new HashMap[String,(ListBuffer[Map[String,Double]],ListBuffer[Map[String,Double]])]
+    var i = 0
+    for(doc <- iter){
+      if(i % 1000 == 0) println(i+" docs loaded.")
+      
+      val features = lrFeatures(doc)
+      for(topic <- allTopics){
+        val tuple = result.getOrElseUpdate(topic, ((new ListBuffer[Map[String,Double]], new ListBuffer[Map[String,Double]])) )
+        if(doc.topics.contains(topic)){
+          tuple._1 += features
+        }else{
+          tuple._2 += features
+        }
+      }
+      i = i + 1
+    }
+    
+    result
   }
   
   def f1score(prec: Double, recall: Double) : Double = {
@@ -172,14 +198,14 @@ object Main {
     found.intersect(relevant).size.toDouble / relevant.size.toDouble
   }
   
-  def getClassifiers(method: String, topics: Map[String,Set[String]], iter: Iterator[XMLDocument]) : ClassifierMaster = {
+  def getClassifiers(method: String, topics: Set[String], iter: Iterator[XMLDocument]) : ClassifierMaster = {
 	if(method.equals("lr")){
 	    // get idf values (for topic descriptions)
-	    cfs = calculateCFS(topics)
+	    cfs = calculateCFS()
 	    
 	    println("> Finally building Training Set")
-	    val train = takeTransform(iter,TO_TRAIN,d => ((d.topics, lrFeatures(d))) )
-	    return new OverPointFiveCM(topics.keys.map(t => new LogisticRegression(t,train)).toList)
+	    val train = docsToSets(iter,topics)
+	    return new OverConstCM(0.5,topics.map(t => new LogisticRegression(t,train(t)._1, train(t)._2)).toList)
 	}else if(method.equals("nb")){
 		// divide docs tfs to different topics by reference, without duplicates
 		val map = HashMap.empty[String,HashMap[String,Int]]
@@ -216,14 +242,16 @@ object Main {
 		return new TopValueCM(3,map.keys.map(k => new NaiveBayes(k, map(k).toMap, length(k), cDocs(k), totDocs, vocabulary.size)))
 	} else if(method.equals("svm")) {
 	    // get idf values (for topic descriptions)
-	    cfs = calculateCFS(topics)
-	    val train = takeTransform(iter,TO_TRAIN,d => ((d.topics, lrFeatures(d))) )
-	    return new OverPointFiveCM(topics.keys.map(t => new SupportVectorMachine(t,train)).toList)
+	    cfs = calculateCFS()
+	    StopWatch.tick
+	    println("> Finally building Training Set")
+	    val train = docsToSets(iter,topics)
+	    return new OverConstCM(0.5,topics.map(t => new LogisticRegression(t,train(t)._1, train(t)._2)).toList)
 	}
-	new OverPointFiveCM(List()) // PLEASE DONT GO HERE :P
+	new TopValueCM(1,List()) // PLEASE DONT GO HERE :P
   }
   
-  private def takeTransform[T](iter: Iterator[XMLDocument], amount: Int, transform: XMLDocument => T) : Iterable[T] = {
+  /*private def takeTransform[T](iter: Iterator[XMLDocument], amount: Int, transform: XMLDocument => T) : Iterable[T] = {
 	val train = new ListBuffer[T]
 	var doc : XMLDocument = null
 	var i = 0
@@ -233,7 +261,7 @@ object Main {
 	  i = i + 1
 	}
 	train
-  }
+  }*/
   
   private def addAll(hashmap: HashMap[String,Int], other: Map[String,Int]) = {
 	for(entry <- other){
@@ -241,7 +269,7 @@ object Main {
 	}
   }
   
-  def calculateCFS(topics: Map[String,Set[String]]) = {
+  def calculateCFS() = {
     var iter = new ReutersCorpusIterator("./reuter/data/train")
     var num_docs = 0
     
@@ -259,23 +287,18 @@ object Main {
     cfs.toMap
   }
   
-  def getTopicCounts(docs: List[XMLDocument]) : Map[String,Double] = {
+  /*def getTopicCounts(docs: List[XMLDocument]) : Map[String,Double] = {
 	  docs.flatMap(d => d.topics).groupBy(identity).mapValues(v => v.length.toDouble / docs.length.toDouble)
-  }
+  }*/
   
-  def loadTopics() : Map[String,Set[String]] = {
-    val file = scala.io.Source.fromFile("./reuter/topic_codes.txt")
-    val lines = file.getLines
-    
-    val result = scala.collection.mutable.Map[String, Set[String]]()
-    
-    for(line <- lines){
-      if(!line.startsWith(";") && line.length() > 5){
-	      val split = line.split("\t")
-	      result += (split(0) -> (Tokenizer.tokenize(split(1)).map(Utilities.getStem(_)).filter(t => t.length() > 1).toSet))
-      }
-    }
-    result.toMap
+  def loadTopics() : Set[String] = {
+    /*val file = scala.io.Source.fromFile("./reuter/topic_codes.txt")
+
+    file.getLines.map(l => l.split("\t")(0)).toSet*/
+    val iter = new ReutersCorpusIterator("./reuter/data/train")
+    val result = new HashSet[String]
+    val temp = iter.foreach(result ++= _.topics)
+    result.toSet
   }
   
   def lrFeatures(doc: XMLDocument) : Map[String,Double] = {
