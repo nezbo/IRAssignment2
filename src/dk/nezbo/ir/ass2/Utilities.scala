@@ -5,7 +5,13 @@ import scala.collection.mutable.HashMap
 import ch.ethz.dal.classifier.processing.XMLDocument
 import scala.collection.mutable.PriorityQueue
 
+/**
+ * Various utility methods that are helpful in other
+ * parts of the program.
+ */
 object Utilities {
+  
+  // FIELDS
   
   val stopWords = Set("a","about","above","after","again","against","all","am","an","and","any","are","aren't","as","at",
       "be","because","been","before","being","below","between","both","but","by","can't","cannot","could","couldn't",
@@ -20,8 +26,10 @@ object Utilities {
       "when's","where","where's","which","while","who","who's","whom","why","why's","with","won't","would","wouldn't",
       "you","you'd","you'll","you're","you've","your","yours","yourself","yourselves")
 
-    // cache to reduce time stemming common words, cleared often to limit memory usage
+  // cache to reduce time stemming common words, cleared often to limit memory usage
   val stemCache : HashMap[String,String] = new HashMap[String,String]
+  
+  // METHODS
   
   /**
    * Retrieves the stem of the word if it has already been
@@ -36,28 +44,59 @@ object Utilities {
     stemCache(word)
   }
   
+  /**
+   * Retrieves the term frequencies of a document while
+   * also removing stopwords and very short tokens and
+   * reduces words to their stem.
+   */
   def getTermFrequencies(doc: XMLDocument) : Map[String,Int] = {
-    doc.tokens.filter(!stopWords.contains(_)).map(Utilities.getStem(_)).groupBy(identity).mapValues(v => v.length)
+    doc.tokens.filter(t => !stopWords.contains(t) && t.length() > 2).map(Utilities.getStem(_)).groupBy(identity).mapValues(v => v.length)
   }
   
-  // EXTENSION METHODS
-  
-  	class InclusiveIterator[T](ia: Seq[T]) {
-    def top(amount: Int, lambda: (T => Double)) : Iterable[T] = {
-      val priority = new PriorityQueue[T]()(Ordering.by(x => -1.0-lambda(x)))
-      for(item <- ia){
-        priority += item
-        priority.dequeue
-      }
-      priority.toList.sortBy(lambda)
+  /**
+   * Calculates the F1 Score using the given precision
+   * and recall values.
+   */
+  def f1score(prec: Double, recall: Double) : Double = {
+    if(prec+recall < 0.0001){
+      return 0.0
     }
-	}
-  	
-	implicit def iterator_can_include[A](ia: Seq[A]) = new InclusiveIterator(ia)
+    2.0 * (prec*recall) / (prec+recall)
+  }
   
+  /**
+   * Calculates the precision of a classification using
+   * the Set of found elements compared to the Set of
+   * relevant elements. The elements can be of any type.
+   */
+  def precision[T](found: Set[T], relevant: Set[T]) : Double = {
+    if(found.size == 0){
+      return 0.0
+    }
+    found.intersect(relevant).size.toDouble / found.size.toDouble
+  }
+  
+  /**
+   * Calculates the recall of a classification using
+   * the Set of found elements compared to the Set of
+   * relevant elements. The elements can be of any type.
+   */
+  def recall[T](found: Set[T], relevant: Set[T]) : Double = {
+    if(relevant.size == 0){
+      return 0.0
+    }
+    found.intersect(relevant).size.toDouble / relevant.size.toDouble
+  }
+  
+  /**
+   * Calculates the tf-idf value using the term frequency,
+   * document frequency and total number of documents.
+   */
   def tfidf(tf: Int, df: Int, docs: Int) = {
     (1+Math.log10(tf)) * idf(df,docs)
   }
+  
+  // PRIVATE HELPER METHODS
   
   private def idf(df: Int, n: Int) = {
     Math.log(n) - Math.log(df)
